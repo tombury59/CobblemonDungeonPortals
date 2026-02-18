@@ -1,0 +1,10 @@
+{
+  "type": "cdp:dungeon_type",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "layers": [{ "block": "minecraft:bedrock", "height": 1 }],
+      "biome": "minecraft:the_void"
+    }
+  }
+}

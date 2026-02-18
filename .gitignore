@@ -1,0 +1,12 @@
+# Gradle
+.gradle/
+build/
+
+# IDE (IntelliJ)
+.idea/
+*.iml
+*.iws
+
+# Minecraft / Fabric
+run/
+.fabric/

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "cdp",
+  "version": "1.0.0",
+  "name": "Cobblemon Dungeon Portals",
+  "description": "Un mod pour ajouter des portails de donjons avec Cobblemon",
+  "authors": ["TonPseudo"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/cdp/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "fr.academy.cdp.CDPMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.14",
+    "minecraft": "1.21.1",
+    "fabric-api": "0.116.5+1.21.1",
+    "cobblemon": "1.6.1+1.21.1",
+    "geckolib": "4.7.6",
+    "fabric-language-kotlin": "*"
+  },
+  "entrypoints": {
+    "main": [ "fr.academy.cdp.CDPMod" ],
+    "client": [ "fr.academy.cdp.client.CDPClient" ]
+  }
+}
