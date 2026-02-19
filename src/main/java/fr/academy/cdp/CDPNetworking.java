@@ -6,26 +6,60 @@ import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import java.util.List;
 
 public class CDPNetworking {
-    public static final Identifier OPEN_SCREEN_ID = Identifier.of("cdp", "open_dungeon_screen");
+    public static final Identifier OPEN_SCREEN_ID = Identifier.of("cdp", "open_screen");
+    public static final Identifier CONFIRM_WARP_ID = Identifier.of("cdp", "confirm_warp");
+    public static final Identifier LOBBY_UPDATE_ID = Identifier.of("cdp", "lobby_update");
+    public static final Identifier START_DUNGEON_ID = Identifier.of("cdp", "start_dungeon");
 
-    public record OpenScreenPayload(int cap, String mode, int diff, String t1, String t2) implements CustomPayload {
+    public record OpenScreenPayload(int cap, String mode, int diff, String t1, String t2, BlockPos pos) implements CustomPayload {
         public static final Id<OpenScreenPayload> ID = new Id<>(OPEN_SCREEN_ID);
-
         public static final PacketCodec<RegistryByteBuf, OpenScreenPayload> CODEC = PacketCodec.tuple(
                 PacketCodecs.VAR_INT, OpenScreenPayload::cap,
                 PacketCodecs.STRING, OpenScreenPayload::mode,
                 PacketCodecs.VAR_INT, OpenScreenPayload::diff,
                 PacketCodecs.STRING, OpenScreenPayload::t1,
                 PacketCodecs.STRING, OpenScreenPayload::t2,
+                BlockPos.PACKET_CODEC, OpenScreenPayload::pos,
                 OpenScreenPayload::new
         );
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
 
+    public record ConfirmWarpPayload(BlockPos pos) implements CustomPayload {
+        public static final Id<ConfirmWarpPayload> ID = new Id<>(CONFIRM_WARP_ID);
+        public static final PacketCodec<RegistryByteBuf, ConfirmWarpPayload> CODEC = PacketCodec.tuple(
+                BlockPos.PACKET_CODEC, ConfirmWarpPayload::pos,
+                ConfirmWarpPayload::new
+        );
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
+    public record LobbyUpdatePayload(List<String> names) implements CustomPayload {
+        public static final Id<LobbyUpdatePayload> ID = new Id<>(LOBBY_UPDATE_ID);
+        public static final PacketCodec<RegistryByteBuf, LobbyUpdatePayload> CODEC = PacketCodec.tuple(
+                PacketCodecs.STRING.collect(PacketCodecs.toList()), LobbyUpdatePayload::names,
+                LobbyUpdatePayload::new
+        );
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
+    public record StartDungeonPayload(BlockPos pos) implements CustomPayload {
+        public static final Id<StartDungeonPayload> ID = new Id<>(START_DUNGEON_ID);
+        public static final PacketCodec<RegistryByteBuf, StartDungeonPayload> CODEC = PacketCodec.tuple(
+                BlockPos.PACKET_CODEC, StartDungeonPayload::pos,
+                StartDungeonPayload::new
+        );
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
     public static void registerPackets() {
         PayloadTypeRegistry.playS2C().register(OpenScreenPayload.ID, OpenScreenPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(LobbyUpdatePayload.ID, LobbyUpdatePayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(ConfirmWarpPayload.ID, ConfirmWarpPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(StartDungeonPayload.ID, StartDungeonPayload.CODEC);
     }
 }

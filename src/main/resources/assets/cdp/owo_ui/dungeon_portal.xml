@@ -5,22 +5,132 @@
                 <horizontal method="fill">100</horizontal>
                 <vertical method="fill">100</vertical>
             </sizing>
+            <vertical-alignment>center</vertical-alignment>
+            <horizontal-alignment>center</horizontal-alignment>
+
             <children>
                 <flow-layout direction="vertical">
                     <sizing>
-                        <horizontal method="fixed">150</horizontal>
+                        <horizontal method="fixed">360</horizontal>
                         <vertical method="content"/>
                     </sizing>
-                    <surface>
-                        <panel/>
-                    </surface>
+                    <surface><panel/></surface>
+                    <padding><all>10</all></padding>
+
                     <children>
+
+                        <!-- TITLE -->
                         <label id="title">
-                            <text>TEST</text>
+                            <text>§l§bPORTAL TERMINAL</text>
+                            <margins><bottom>8</bottom></margins>
                         </label>
-                        <button id="warp-button">
-                            <text>BOUTON</text>
-                        </button>
+
+                        <!-- SEPARATOR -->
+                        <box>
+                            <sizing>
+                                <horizontal method="fill">100</horizontal>
+                                <vertical method="fixed">1</vertical>
+                            </sizing>
+                            <color>#553399FF</color>
+                            <margins><bottom>8</bottom></margins>
+                        </box>
+
+                        <!-- MAIN ROW -->
+                        <flow-layout direction="horizontal">
+                            <sizing>
+                                <horizontal method="fill">100</horizontal>
+                                <vertical method="content"/>
+                            </sizing>
+
+                            <children>
+
+                                <!-- PLAYERS PANEL : hauteur fixe généreuse -->
+                                <flow-layout direction="vertical">
+                                    <sizing>
+                                        <horizontal method="fixed">155</horizontal>
+                                        <vertical method="fixed">130</vertical>
+                                    </sizing>
+                                    <surface><vanilla-translucent/></surface>
+                                    <padding><all>6</all></padding>
+                                    <children>
+                                        <label>
+                                            <text>§b§lPLAYERS</text>
+                                            <margins><bottom>4</bottom></margins>
+                                        </label>
+                                        <label id="no-players-label">
+                                            <text>§7Empty...</text>
+                                            <margins><top>4</top></margins>
+                                        </label>
+                                    </children>
+                                </flow-layout>
+
+                                <!-- GAP -->
+                                <flow-layout direction="vertical">
+                                    <sizing>
+                                        <horizontal method="fixed">8</horizontal>
+                                        <vertical method="fixed">1</vertical>
+                                    </sizing>
+                                </flow-layout>
+
+                                <!-- RIGHT PANEL : content uniquement, pas de fixed height
+                                     360 - 20(padding) - 155(players) - 8(gap) = 177 -->
+                                <flow-layout direction="vertical">
+                                    <sizing>
+                                        <horizontal method="fixed">177</horizontal>
+                                        <vertical method="content"/>
+                                    </sizing>
+
+                                    <children>
+
+                                        <!-- MODE + LIMIT -->
+                                        <flow-layout direction="vertical">
+                                            <sizing>
+                                                <horizontal method="fill">100</horizontal>
+                                                <vertical method="content"/>
+                                            </sizing>
+                                            <surface><vanilla-translucent/></surface>
+                                            <padding><all>5</all></padding>
+                                            <margins><bottom>5</bottom></margins>
+                                            <children>
+                                                <label id="mode-label"><text>§7MODE: §f--</text></label>
+                                                <label id="cap-label">
+                                                    <text>§7LIMIT: §eLvl.--</text>
+                                                    <margins><top>3</top></margins>
+                                                </label>
+                                            </children>
+                                        </flow-layout>
+
+                                        <!-- TYPE TAGS -->
+                                        <flow-layout direction="horizontal" id="type-container">
+                                            <sizing>
+                                                <horizontal method="fill">100</horizontal>
+                                                <vertical method="content"/>
+                                            </sizing>
+                                            <margins><bottom>8</bottom></margins>
+                                            <children>
+                                                <label id="type-1-label"><text></text></label>
+                                                <label id="type-2-label">
+                                                    <text></text>
+                                                    <margins><left>5</left></margins>
+                                                </label>
+                                            </children>
+                                        </flow-layout>
+
+                                        <!-- WARP BUTTON -->
+                                        <button id="warp-button">
+                                            <text>§l⟶ WARP</text>
+                                            <sizing>
+                                                <horizontal method="fill">100</horizontal>
+                                                <vertical method="fixed">20</vertical>
+                                            </sizing>
+                                        </button>
+
+                                    </children>
+                                </flow-layout>
+
+                            </children>
+                        </flow-layout>
+
                     </children>
                 </flow-layout>
             </children>
