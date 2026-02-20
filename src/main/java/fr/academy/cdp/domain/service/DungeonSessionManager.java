@@ -33,4 +33,20 @@ public class DungeonSessionManager {
         sessions.remove(pos);
     }
 
+    private static final Map<UUID, net.minecraft.nbt.NbtList> inventoryStorage = new HashMap<>();
+
+    public static void storeInventory(UUID uuid, net.minecraft.nbt.NbtList list) {
+        inventoryStorage.put(uuid, list);
+    }
+
+    // Vérifie si un inventaire est stocké sans le supprimer
+    public static boolean hasInventory(UUID uuid) {
+        return inventoryStorage.containsKey(uuid);
+    }
+
+    // Récupère l'inventaire ET le supprime de la mémoire
+    public static net.minecraft.nbt.NbtList loadInventory(UUID uuid) {
+        return inventoryStorage.remove(uuid);
+    }
+
 }

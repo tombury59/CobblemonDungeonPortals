@@ -12,17 +12,21 @@ import fr.academy.cdp.infrastructure.service.DungeonSurvivalService;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import java.util.List;
 import java.util.UUID;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
 public class CDPMod implements ModInitializer {
     public static final String MOD_ID = "cdp";
@@ -91,6 +95,51 @@ public class CDPMod implements ModInitializer {
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             new CDPCommand().register(dispatcher);
+        });
+
+        ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
+            // Si le joueur revient à la vie et qu'il avait un inventaire sauvegardé
+            NbtList savedInv = DungeonSessionManager.loadInventory(newPlayer.getUuid());
+            if (savedInv != null) {
+                newPlayer.getInventory().clear();
+                newPlayer.getInventory().readNbt(savedInv);
+                newPlayer.getInventory().markDirty();
+                newPlayer.sendMessage(Text.literal("§6[CDP] Ton inventaire a été restauré après ta mort !"), false);
+
+                // On restaure aussi ses Pokémon s'ils étaient bridés
+                var party = com.cobblemon.mod.common.Cobblemon.INSTANCE.getStorage().getParty(newPlayer);
+                for (var pokemon : party) {
+                    if (pokemon.getPersistentData().contains("CDP_OriginalLevel")) {
+                        pokemon.setLevel(pokemon.getPersistentData().getInt("CDP_OriginalLevel"));
+                        pokemon.getPersistentData().remove("CDP_OriginalLevel");
+                    }
+                }
+            }
+        });
+
+        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> {
+            // Si le joueur quitte le monde du donjon
+            if (origin.getRegistryKey().equals(TestService.DUNGEON_WORLD_KEY) &&
+                    !destination.getRegistryKey().equals(TestService.DUNGEON_WORLD_KEY)) {
+
+                // On récupère le serveur depuis le joueur
+                var server = player.getServer();
+                if (server != null) {
+                    server.execute(() -> {
+                        // On force le nettoyage (Inventaire, Mode de jeu, Pokémon)
+                        new TestService().forceCleanExit(player);
+                    });
+                }
+            }
+        });
+
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            var player = handler.getPlayer();
+            if (player.getWorld().getRegistryKey().equals(TestService.DUNGEON_WORLD_KEY)) {
+                // Le joueur quitte le serveur en plein donjon -> On le nettoie immédiatement
+                // Au retour, il se reconnectera dans l'Overworld avec son inventaire restauré
+                new TestService().forceCleanExit(player);
+            }
         });
     }
 
