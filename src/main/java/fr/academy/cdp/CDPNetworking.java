@@ -15,19 +15,36 @@ public class CDPNetworking {
     public static final Identifier LOBBY_UPDATE_ID = Identifier.of("cdp", "lobby_update");
     public static final Identifier START_DUNGEON_ID = Identifier.of("cdp", "start_dungeon");
 
-    public record OpenScreenPayload(int cap, String mode, int diff, String t1, String t2, BlockPos pos) implements CustomPayload {
-        public static final Id<OpenScreenPayload> ID = new Id<>(OPEN_SCREEN_ID);
-        public static final PacketCodec<RegistryByteBuf, OpenScreenPayload> CODEC = PacketCodec.tuple(
-                PacketCodecs.VAR_INT, OpenScreenPayload::cap,
-                PacketCodecs.STRING, OpenScreenPayload::mode,
-                PacketCodecs.VAR_INT, OpenScreenPayload::diff,
-                PacketCodecs.STRING, OpenScreenPayload::t1,
-                PacketCodecs.STRING, OpenScreenPayload::t2,
-                BlockPos.PACKET_CODEC, OpenScreenPayload::pos,
-                OpenScreenPayload::new
+    public record OpenScreenPayload(int cap, String mode, int diff, String t1, String t2, BlockPos pos, List<String> currentNames, boolean isStarted) implements CustomPayload {
+        public static final Id<OpenScreenPayload> ID = new Id<>(Identifier.of("cdp", "open_screen"));
+
+        public static final PacketCodec<RegistryByteBuf, OpenScreenPayload> CODEC = PacketCodec.of(
+                (value, buf) -> {
+                    buf.writeVarInt(value.cap);
+                    buf.writeString(value.mode);
+                    buf.writeVarInt(value.diff);
+                    buf.writeString(value.t1);
+                    buf.writeString(value.t2);
+                    buf.writeBlockPos(value.pos);
+                    // Utilisation simplifiée du codec de liste
+                    PacketCodecs.STRING.collect(PacketCodecs.toList()).encode(buf, value.currentNames);
+                    buf.writeBoolean(value.isStarted);
+                },
+                buf -> new OpenScreenPayload(
+                        buf.readVarInt(),
+                        buf.readString(),
+                        buf.readVarInt(),
+                        buf.readString(),
+                        buf.readString(),
+                        buf.readBlockPos(),
+                        PacketCodecs.STRING.collect(PacketCodecs.toList()).decode(buf),
+                        buf.readBoolean()
+                )
         );
+
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
+
 
     public record ConfirmWarpPayload(BlockPos pos) implements CustomPayload {
         public static final Id<ConfirmWarpPayload> ID = new Id<>(CONFIRM_WARP_ID);
@@ -38,10 +55,12 @@ public class CDPNetworking {
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
-    public record LobbyUpdatePayload(List<String> names) implements CustomPayload {
+    // MODIFIÉ : Ajout de isStarted pour mettre à jour le bouton en temps réel pour les joueurs déjà sur l'écran
+    public record LobbyUpdatePayload(List<String> names, boolean isStarted) implements CustomPayload {
         public static final Id<LobbyUpdatePayload> ID = new Id<>(LOBBY_UPDATE_ID);
         public static final PacketCodec<RegistryByteBuf, LobbyUpdatePayload> CODEC = PacketCodec.tuple(
                 PacketCodecs.STRING.collect(PacketCodecs.toList()), LobbyUpdatePayload::names,
+                PacketCodecs.BOOL, LobbyUpdatePayload::isStarted,
                 LobbyUpdatePayload::new
         );
         @Override public Id<? extends CustomPayload> getId() { return ID; }

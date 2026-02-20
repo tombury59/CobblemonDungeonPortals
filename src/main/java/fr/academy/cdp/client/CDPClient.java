@@ -21,7 +21,7 @@ public class CDPClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(CDPNetworking.LobbyUpdatePayload.ID, (payload, context) -> {
             context.client().execute(() -> {
                 if (context.client().currentScreen instanceof DungeonScreen screen) {
-                    screen.updatePlayerList(payload.names());
+                    screen.updatePlayerList(payload.names(), payload.isStarted());
                 }
             });
         });

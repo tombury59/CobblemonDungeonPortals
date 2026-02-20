@@ -8,6 +8,7 @@ import fr.academy.cdp.infrastructure.block.DungeonPortalBlock;
 import fr.academy.cdp.infrastructure.entity.PortalBlockEntity;
 import fr.academy.cdp.infrastructure.command.CDPCommand;
 import fr.academy.cdp.infrastructure.service.BattleScalingService;
+import fr.academy.cdp.infrastructure.service.DungeonSurvivalService;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -41,6 +42,7 @@ public class CDPMod implements ModInitializer {
 
         CDPNetworking.registerPackets();
         BattleScalingService.register();
+        DungeonSurvivalService.register();
 
         ServerPlayNetworking.registerGlobalReceiver(CDPNetworking.ConfirmWarpPayload.ID, (payload, context) -> {
             context.server().execute(() -> {
@@ -48,6 +50,12 @@ public class CDPMod implements ModInitializer {
                 var be = player.getWorld().getBlockEntity(payload.pos());
                 var settings = (be instanceof PortalBlockEntity pbe) ? pbe.getSettings() : null;
                 var session = DungeonSessionManager.getOrCreateSession(payload.pos(), settings);
+
+                // SÉCURITÉ : Empêcher de rejoindre si c'est déjà actif
+                if (session.isActive()) {
+                    player.sendMessage(Text.literal("§cLe donjon a déjà commencé !"), true);
+                    return;
+                }
 
                 if (session.addPlayer(player.getUuid())) {
                     syncLobby(session, context.server());
@@ -63,18 +71,21 @@ public class CDPMod implements ModInitializer {
                 var session = DungeonSessionManager.getSession(payload.pos());
                 if (session == null || !context.player().getUuid().equals(session.getLeader())) return;
 
-                int cap = session.getSettings().levelCap(); // On récupère le niveau du donjon
+                // MARQUER ACTIF (Verrouille le portail)
+                session.setActive(true);
+                syncLobby(session, context.server()); // On prévient tout le monde que c'est lancé
+
+                int cap = session.getSettings().levelCap();
 
                 for (java.util.UUID uuid : session.getPlayers()) {
                     var groupMember = context.server().getPlayerManager().getPlayer(uuid);
                     if (groupMember != null) {
-                        groupMember.sendMessage(net.minecraft.text.Text.literal("§6Le donjon commence !"), false);
-
-                        // On passe le CAP ici pour brider les pokémon
+                        groupMember.sendMessage(Text.literal("§6Le donjon commence !"), false);
                         new TestService().executeTestSpawn(groupMember, cap);
                     }
                 }
-                DungeonSessionManager.closeSession(payload.pos());
+                // Ne SURTOUT PAS faire closeSession ici, sinon la session disparaît
+                // On la supprimera dans TestService.teleportBack quand le dernier joueur sort.
             });
         });
 
@@ -86,13 +97,17 @@ public class CDPMod implements ModInitializer {
     private void syncLobby(DungeonSession session, net.minecraft.server.MinecraftServer server) {
         List<String> names = session.getPlayers().stream()
                 .map(uuid -> server.getPlayerManager().getPlayer(uuid))
-                .filter(p -> p != null)
+                .filter(java.util.Objects::nonNull)
                 .map(p -> p.getNameForScoreboard())
                 .toList();
-        var updatePacket = new CDPNetworking.LobbyUpdatePayload(names);
-        for (UUID pUuid : session.getPlayers()) {
-            var target = server.getPlayerManager().getPlayer(pUuid);
-            if (target != null) ServerPlayNetworking.send(target, updatePacket);
+
+        // On envoie la liste ET l'état "active"
+        var updatePacket = new CDPNetworking.LobbyUpdatePayload(names, session.isActive());
+
+        // On envoie à tout le monde sur le serveur pour que même ceux qui n'ont pas encore
+        // rejoint voient l'état changer s'ils ouvrent l'interface
+        for (var player : server.getPlayerManager().getPlayerList()) {
+            ServerPlayNetworking.send(player, updatePacket);
         }
     }
 }

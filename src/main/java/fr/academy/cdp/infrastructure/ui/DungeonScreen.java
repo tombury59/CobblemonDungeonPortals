@@ -41,27 +41,22 @@ public class DungeonScreen extends BaseUIModelScreen<FlowLayout> {
             type2Label.text(Text.literal(""));
         }
 
-        // Configuration initiale du bouton (état par défaut)
-        if (warpBtn != null) {
-            warpBtn.setMessage(Text.literal("§6⚡ CRÉER L'INSTANCE"));
-            warpBtn.onPress(button -> {
-                ClientPlayNetworking.send(new CDPNetworking.ConfirmWarpPayload(payload.pos()));
-                button.active(false); // Désactive pour éviter le double-clic avant l'update
-            });
-        }
+        // IMPORTANT : On initialise l'état avec les données reçues à l'ouverture
+        // Cela règle le bug du 3ème joueur qui voyait "Créer"
+        this.updatePlayerList(payload.currentNames(), payload.isStarted());
     }
 
     /**
-     * Appelé quand le serveur envoie la liste des joueurs (LobbyUpdatePayload)
+     * Appelé à l'ouverture (via build) et lors des LobbyUpdatePayload
      */
-    public void updatePlayerList(List<String> names) {
+    public void updatePlayerList(List<String> names, boolean isStarted) {
         if (this.uiAdapter == null) return;
         var root = this.uiAdapter.rootComponent;
 
         var label = root.childById(LabelComponent.class, "no-players-label");
         var warpBtn = root.childById(ButtonComponent.class, "warp-button");
 
-        // 1. Mise à jour de la liste des noms dans le cadre noir
+        // 1. Mise à jour de la liste des noms
         if (label != null) {
             if (names.isEmpty()) {
                 label.text(Text.literal("§8Empty..."));
@@ -74,11 +69,19 @@ public class DungeonScreen extends BaseUIModelScreen<FlowLayout> {
             }
         }
 
-        // 2. Logique de changement d'état du bouton
+        // 2. Logique du bouton avec verrouillage "En cours"
         if (warpBtn != null && MinecraftClient.getInstance().player != null) {
+
+            // CAS : L'instance est déjà lancée (Verrouillage global)
+            if (isStarted) {
+                warpBtn.active(false);
+                warpBtn.setMessage(Text.literal("§cDONJON EN COURS..."));
+                return;
+            }
+
             String localPlayer = MinecraftClient.getInstance().player.getNameForScoreboard();
 
-            // CAS : Le joueur est déjà inscrit dans l'instance
+            // CAS : Le joueur est déjà inscrit
             if (names.contains(localPlayer)) {
                 if (names.get(0).equals(localPlayer)) {
                     // C'est le CHEF
@@ -94,7 +97,7 @@ public class DungeonScreen extends BaseUIModelScreen<FlowLayout> {
                     warpBtn.setMessage(Text.literal("§7EN ATTENTE DU CHEF..."));
                 }
             }
-            // CAS : Une instance existe déjà mais le joueur n'est pas dedans
+            // CAS : Instance existante (Bouton REJOINDRE)
             else if (!names.isEmpty()) {
                 warpBtn.active(true);
                 warpBtn.setMessage(Text.literal("§a✚ REJOINDRE L'INSTANCE"));
@@ -103,7 +106,7 @@ public class DungeonScreen extends BaseUIModelScreen<FlowLayout> {
                     button.active(false);
                 });
             }
-            // CAS : Personne n'est inscrit (retour à l'état initial si tout le monde quitte)
+            // CAS : Personne n'est inscrit (Bouton CRÉER)
             else {
                 warpBtn.active(true);
                 warpBtn.setMessage(Text.literal("§6⚡ CRÉER L'INSTANCE"));

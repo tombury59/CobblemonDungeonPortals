@@ -31,7 +31,7 @@ public record PortalSettings(
 
     public static PortalSettings generateRandom() {
         Random r = new Random();
-        int[] caps = {20, 40, 60, 80, 100};
+        int[] caps = {15, 25, 50, 75, 90};
         DungeonDifficulty[] diffs = DungeonDifficulty.values();
         String[] types = {"Fire", "Water", "Grass", "Electric", "Dragon", "Ice", "Ghost", "Dark", "Steel", "Fairy"};
 

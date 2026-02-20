@@ -1,6 +1,7 @@
 package fr.academy.cdp.domain.service;
 
 import fr.academy.cdp.CDPNetworking;
+import fr.academy.cdp.domain.model.DungeonSession;
 import fr.academy.cdp.infrastructure.entity.PortalBlockEntity;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -11,22 +12,34 @@ public class DungeonService {
     public void interactWithPortal(ServerPlayerEntity player, BlockPos pos) {
         var be = player.getWorld().getBlockEntity(pos);
         if (be instanceof PortalBlockEntity portalBe) {
-            var s = portalBe.getSettings();
-            var session = DungeonSessionManager.getSession(pos);
+            // 1. On récupère les settings
+            var settings = portalBe.getSettings();
 
-            // Correction : On utilise type1() et type2() car c'est ce qu'il y a dans ton record PortalSettings
+            // 2. On récupère ou crée la session
+            var session = DungeonSessionManager.getOrCreateSession(pos, settings);
+
+            // 3. On prépare la liste des noms
+            List<String> names = session.getPlayers().stream()
+                    .map(uuid -> player.getServer().getPlayerManager().getPlayer(uuid))
+                    .filter(p -> p != null)
+                    .map(p -> p.getNameForScoreboard())
+                    .toList();
+
+            // 4. On envoie l'OpenScreenPayload
+            // CORRECTION FINALE : On utilise les noms exacts de ton record
             ServerPlayNetworking.send(player, new CDPNetworking.OpenScreenPayload(
-                    s.levelCap(), s.mode(), s.difficulty().ordinal(), s.type1(), s.type2() != null ? s.type2() : "", pos
+                    settings.levelCap(),    // au lieu de cap()
+                    settings.mode(),        // inchangé
+                    settings.difficulty().ordinal(), // difficulty est une Enum, on envoie son index (int)
+                    settings.type1(),       // au lieu de t1()
+                    settings.type2(),       // au lieu de t2()
+                    pos,
+                    names,
+                    session.isActive()
             ));
 
-            if (session != null) {
-                List<String> names = session.getPlayers().stream()
-                        .map(uuid -> player.getServer().getPlayerManager().getPlayer(uuid))
-                        .filter(p -> p != null)
-                        .map(p -> p.getNameForScoreboard())
-                        .toList();
-                ServerPlayNetworking.send(player, new CDPNetworking.LobbyUpdatePayload(names));
-            }
+            // 5. On envoie l'update de lobby
+            ServerPlayNetworking.send(player, new CDPNetworking.LobbyUpdatePayload(names, session.isActive()));
         }
     }
 }

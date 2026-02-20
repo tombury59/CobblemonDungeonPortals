@@ -11,7 +11,7 @@ public class DungeonSessionManager {
     private static final Map<BlockPos, DungeonSession> sessions = new HashMap<>();
 
     public static DungeonSession getOrCreateSession(BlockPos pos, PortalSettings settings) {
-        return sessions.computeIfAbsent(pos, k -> new DungeonSession(settings));
+        return sessions.computeIfAbsent(pos, k -> new DungeonSession(settings,pos));
     }
 
     public static DungeonSession getSession(BlockPos pos) {
@@ -28,4 +28,9 @@ public class DungeonSessionManager {
     public static void closeSession(BlockPos pos) {
         sessions.remove(pos);
     }
+
+    public static void removeSession(BlockPos pos) {
+        sessions.remove(pos);
+    }
+
 }
