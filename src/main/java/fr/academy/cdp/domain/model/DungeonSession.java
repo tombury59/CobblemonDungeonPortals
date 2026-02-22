@@ -31,4 +31,9 @@ public class DungeonSession {
     public UUID getLeader() {
         return players.isEmpty() ? null : players.get(0);
     }
+
+    private int gridX;
+
+    public void setGridX(int x) { this.gridX = x; }
+    public int getGridX() { return gridX; }
 }

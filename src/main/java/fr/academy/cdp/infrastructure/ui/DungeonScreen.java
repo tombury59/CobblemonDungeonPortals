@@ -10,6 +10,10 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.Identifier;
 import net.minecraft.text.Text;
 import java.util.List;
+import io.wispforest.owo.ui.component.Components;
+import io.wispforest.owo.ui.component.ItemComponent;
+import io.wispforest.owo.ui.core.Sizing;
+import net.minecraft.item.Items;
 
 public class DungeonScreen extends BaseUIModelScreen<FlowLayout> {
     private final CDPNetworking.OpenScreenPayload payload;
@@ -39,6 +43,33 @@ public class DungeonScreen extends BaseUIModelScreen<FlowLayout> {
             type2Label.text(Text.literal("§e[" + payload.t2().toUpperCase() + "]"));
         } else if (type2Label != null) {
             type2Label.text(Text.literal(""));
+        }
+
+
+        var starsContainer = rootComponent.childById(FlowLayout.class, "stars-container");
+        if (starsContainer != null) {
+            starsContainer.clearChildren();
+
+            // 1. Correction du nom : Si 'difficulty()' échoue, vérifie ton record OpenScreenPayload.
+            // Dans ton DungeonService tu envoyais settings.difficulty().ordinal().
+            int diffValue = payload.diff();
+            int starCount = diffValue + 1; // 1 à 5
+
+            for (int i = 0; i < 5; i++) {
+                // On crée un label au lieu d'un composant d'item
+                var starLabel = Components.label(Text.literal("★"));
+
+                if (i < starCount) {
+                    // Étoile active : Jaune brillant
+                    starLabel.text(Text.literal("§6★"));
+                } else {
+                    // Étoile vide : Gris foncé
+                    starLabel.text(Text.literal("§8★"));
+                }
+
+                starLabel.margins(io.wispforest.owo.ui.core.Insets.left(2));
+                starsContainer.child(starLabel);
+            }
         }
 
         // IMPORTANT : On initialise l'état avec les données reçues à l'ouverture

@@ -14,19 +14,18 @@ import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 public class PortalBlockEntity extends BlockEntity {
-    // On initialise avec des réglages aléatoires par défaut
     private PortalSettings settings = PortalSettings.generateRandom();
 
     public PortalBlockEntity(BlockPos pos, BlockState state) {
         super(CDPMod.PORTAL_BLOCK_ENTITY, pos, state);
     }
 
-    // LA MÉTHODE MANQUANTE QUE LA COMMANDE APPELLE
     public void setSettings(PortalSettings settings) {
         this.settings = settings;
-        this.markDirty(); // Indique à Minecraft de sauvegarder le bloc
+        this.markDirty();
         if (world != null && !world.isClient) {
-            world.updateListeners(pos, getCachedState(), getCachedState(), 3); // Synchro client/serveur
+            // Envoie les nouvelles couleurs à tous les joueurs proches
+            world.updateListeners(pos, getCachedState(), getCachedState(), 3);
         }
     }
 
@@ -34,7 +33,6 @@ public class PortalBlockEntity extends BlockEntity {
         return settings;
     }
 
-    // SAUVEGARDE NBT (Pour que le portail garde ses piments après un restart)
     @Override
     protected void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
         super.writeNbt(nbt, registryLookup);
@@ -45,7 +43,6 @@ public class PortalBlockEntity extends BlockEntity {
         nbt.putString("Type2", settings.type2());
     }
 
-    // CHARGEMENT NBT
     @Override
     protected void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
         super.readNbt(nbt, registryLookup);

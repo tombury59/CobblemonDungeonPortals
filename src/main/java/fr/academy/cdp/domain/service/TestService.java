@@ -2,130 +2,168 @@ package fr.academy.cdp.domain.service;
 
 import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.pokemon.Pokemon;
-import fr.academy.cdp.CDPMod;
 import fr.academy.cdp.domain.model.DungeonSession;
-import net.minecraft.nbt.NbtCompound;
+import fr.academy.cdp.infrastructure.service.StructureService;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
 import net.minecraft.world.GameMode;
-import java.util.UUID;
+import net.minecraft.world.World;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
 
+import java.util.UUID;
 import java.util.List;
 
 public class TestService {
     public static final RegistryKey<World> DUNGEON_WORLD_KEY = RegistryKey.of(
             RegistryKeys.WORLD, Identifier.of("cdp", "dungeon_world"));
 
-    // Identifiant NBT pour la sauvegarde
-    private static final String INVENTORY_NBT_KEY = "CDP_StoredInventory";
-
     /**
-     * Appelé quand le chef lance l'instance ou qu'un joueur rejoint un donjon actif.
+     * Lance l'entrée dans le donjon pour un joueur.
+     * Gère la Grid et la Structure si c'est le premier joueur.
      */
     public void executeTestSpawn(ServerPlayerEntity player, int levelCap) {
-        var server = player.getServer();
+        MinecraftServer server = player.getServer();
         if (server == null) return;
 
-        var destWorld = server.getWorld(DUNGEON_WORLD_KEY);
-        if (destWorld != null) {
+        ServerWorld destWorld = server.getWorld(DUNGEON_WORLD_KEY);
+        if (destWorld == null) return;
 
-            // 1. SAUVEGARDE ET VIDE L'INVENTAIRE
-            saveAndClearInventory(player);
+        DungeonSession session = DungeonSessionManager.getPlayerSession(player.getUuid());
+        if (session == null) return;
 
-            // 2. SOIN ET BRIDAGE DES POKÉMON
-            var party = Cobblemon.INSTANCE.getStorage().getParty(player);
-            for (Pokemon pokemon : party) {
-                // Soin complet (PV/PP/Status)
-                pokemon.heal();
+        // --- 1. GESTION DE LA GRID & STRUCTURE ---
+        // On initialise le slot seulement si la session n'en a pas encore (premier joueur)
+        if (session.getGridX() == -1) {
+            int slotX = GridManager.findFreeSlot();
+            session.setGridX(slotX);
 
-                // Bridage du niveau si supérieur au cap
-                if (pokemon.getLevel() > levelCap) {
-                    pokemon.getPersistentData().putInt("CDP_OriginalLevel", pokemon.getLevel());
-                    pokemon.setLevel(levelCap);
-                }
-            }
+            // Choix de la structure selon le mode
+            String structureName = session.getSettings().mode().equalsIgnoreCase("WAVE")
+                    ? "wave_arena"
+                    : "clear_tours_1";
 
-            // 3. TÉLÉPORTATION
-            player.sendMessage(Text.literal("§a[CDP] Pokémon soignés. Inventaire mis en sécurité !"), false);
-            // On vise le centre de la structure de test (0, 65, 0)
-            player.teleport(destWorld, 0.5, 65.5, 0.5, player.getYaw(), player.getPitch());
-            player.changeGameMode(net.minecraft.world.GameMode.ADVENTURE);
-
-            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.SATURATION, 999999, 10, true, false));
-
-            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.REGENERATION, 999999, 10, true, false));
-        }
-    }
-
-    /**
-     * Appelé lors de la sortie du donjon (mort, victoire ou abandon).
-     */
-    public void teleportBack(ServerPlayerEntity player) {
-        var server = player.getServer();
-        if (server == null) return;
-
-        // 1. GESTION DE LA SESSION
-        var session = DungeonSessionManager.getPlayerSession(player.getUuid());
-        if (session != null) {
-            session.getPlayers().remove(player.getUuid());
-
-            // Si le dernier joueur part, on détruit le portail
-            if (session.getPlayers().isEmpty()) {
-                BlockPos pos = session.getPortalPos();
-                server.getOverworld().setBlockState(pos, net.minecraft.block.Blocks.AIR.getDefaultState());
-                DungeonSessionManager.removeSession(pos);
-            }
+            // Placement physique de la structure NBT
+            StructureService.placeDungeonStructure(destWorld, new BlockPos(slotX, 64, 0), structureName);
         }
 
-        // 2. RESTAURATION DE L'INVENTAIRE
-        restoreInventory(player);
+        int currentSlotX = session.getGridX();
 
-        // 3. RESTAURATION DES NIVEAUX POKÉMON
+        // --- 2. PRÉPARATION DU JOUEUR (Hardcore No-Heal Logic) ---
+        saveAndClearInventory(player);
+
         var party = Cobblemon.INSTANCE.getStorage().getParty(player);
         for (Pokemon pokemon : party) {
-            if (pokemon.getPersistentData().contains("CDP_OriginalLevel")) {
-                pokemon.setLevel(pokemon.getPersistentData().getInt("CDP_OriginalLevel"));
-                pokemon.getPersistentData().remove("CDP_OriginalLevel");
+            pokemon.heal(); // Soin complet à l'entrée
+
+            // Bridage du niveau (Scaling)
+            if (pokemon.getLevel() > levelCap) {
+                pokemon.getPersistentData().putInt("CDP_OriginalLevel", pokemon.getLevel());
+                pokemon.setLevel(levelCap);
             }
         }
 
-        // 4. RETOUR AU SPAWN DU MONDE PRINCIPAL
-        BlockPos spawn = server.getOverworld().getSpawnPos();
-        player.teleport(server.getOverworld(), spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5, 0, 0);
-        player.sendMessage(Text.literal("§6[CDP] Donjon terminé : Inventaire et niveaux restaurés."), false);
-        // Dans TestService.java, méthode teleportBack
-        player.changeGameMode(net.minecraft.world.GameMode.SURVIVAL);
+        // --- 3. TÉLÉPORTATION ---
+        // On TP au centre du slot X (offset 0.5 pour éviter d'être dans un mur)
+        player.teleport(destWorld, currentSlotX + 8.5, 65.0, 8.5, player.getYaw(), player.getPitch());
+        player.changeGameMode(GameMode.ADVENTURE);
+
+        // Effets de confort pour éviter la mort par faim ou chute au spawn
+        player.addStatusEffect(new StatusEffectInstance(StatusEffects.SATURATION, 100, 10, true, false));
+        player.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, 100, 255, true, false));
+
+        player.sendMessage(Text.literal("§a[CDP] Bienvenue dans le donjon !"), false);
     }
 
     /**
-     * Utilitaires NBT pour l'inventaire
+     * Sortie propre du donjon.
      */
+    public void teleportBack(ServerPlayerEntity player) {
+        MinecraftServer server = player.getServer();
+        if (server == null) return;
+
+        UUID uuid = player.getUuid();
+        DungeonSession session = DungeonSessionManager.getPlayerSession(uuid);
+
+        if (session != null) {
+            session.getPlayers().remove(uuid);
+
+            // Si c'est le dernier joueur, on nettoie la Grid
+            if (session.getPlayers().isEmpty()) {
+                cleanupDungeon(server, session);
+            }
+        }
+
+        // Restauration Data
+        restoreInventory(player);
+        restorePokemonLevels(player);
+
+        // Reset Physique
+        player.clearStatusEffects();
+        player.changeGameMode(GameMode.SURVIVAL);
+
+        // Retour Overworld
+        BlockPos spawn = server.getOverworld().getSpawnPos();
+        player.teleport(server.getOverworld(), spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5, 0, 0);
+
+        player.sendMessage(Text.literal("§6[CDP] Session terminée. État restauré."), false);
+    }
+
+    /**
+     * Nettoyage de la zone dans la dimension Donjon.
+     */
+    private void cleanupDungeon(MinecraftServer server, DungeonSession session) {
+        ServerWorld dungeonWorld = server.getWorld(DUNGEON_WORLD_KEY);
+        if (dungeonWorld != null) {
+            int x = session.getGridX();
+            // On libère le slot dans le manager
+            GridManager.releaseSlot(x);
+
+            // Suppression du portail dans l'Overworld
+            BlockPos portalPos = session.getPortalPos();
+            server.getOverworld().setBlockState(portalPos, net.minecraft.block.Blocks.AIR.getDefaultState());
+
+            DungeonSessionManager.removeSession(portalPos);
+
+            // Note: Une suppression réelle des blocs via itérateur peut être ajoutée ici
+            // pour optimiser les performances si nécessaire.
+        }
+    }
+
+    public void forceCleanExit(ServerPlayerEntity player) {
+        player.changeGameMode(GameMode.SURVIVAL);
+        player.clearStatusEffects();
+        restoreInventory(player);
+        restorePokemonLevels(player);
+
+        UUID uuid = player.getUuid();
+        DungeonSession session = DungeonSessionManager.getPlayerSession(uuid);
+        if (session != null) {
+            session.getPlayers().remove(uuid);
+            if (session.getPlayers().isEmpty() && player.getServer() != null) {
+                cleanupDungeon(player.getServer(), session);
+            }
+        }
+    }
+
     private void saveAndClearInventory(ServerPlayerEntity player) {
-        // 1. Création de la liste NBT (objets moddés inclus)
         NbtList inventoryNbt = new NbtList();
         player.getInventory().writeNbt(inventoryNbt);
-
-        // 2. Sauvegarde dans le Manager (survit tant que le serveur est allumé)
         DungeonSessionManager.storeInventory(player.getUuid(), inventoryNbt);
 
-        // 3. Vidage complet
         player.getInventory().clear();
         player.getInventory().markDirty();
     }
 
     private void restoreInventory(ServerPlayerEntity player) {
-        // Récupération et suppression immédiate du stockage pour éviter les doublons
         NbtList savedInv = DungeonSessionManager.loadInventory(player.getUuid());
-
         if (savedInv != null) {
             player.getInventory().clear();
             player.getInventory().readNbt(savedInv);
@@ -133,60 +171,8 @@ public class TestService {
         }
     }
 
-    /**
-     * Récupère les noms des joueurs pour l'UI
-     */
-    public List<String> getSessionPlayerNames(MinecraftServer server, DungeonSession session) {
-        return session.getPlayers().stream()
-                .map(uuid -> {
-                    var p = server.getPlayerManager().getPlayer(uuid);
-                    return p != null ? p.getNameForScoreboard() : "Unknown";
-                }).toList();
-    }
-
-    /**
-     * Nettoyage forcé si le joueur quitte la dimension par un autre moyen
-     */
-    public void forceCleanExit(ServerPlayerEntity player) {
-        // A. RESET PHYSIQUE
-        player.changeGameMode(GameMode.SURVIVAL);
-
-        player.clearStatusEffects();
-        player.getHungerManager().setFoodLevel(20);
-        player.setFireTicks(0);
-
-        player.stopRiding();           // Sortir d'une monture Pokémon
-        player.getAbilities().flying = false; // Stopper le vol si bug
-        player.getAbilities().invulnerable = false;
-        player.sendAbilitiesUpdate();
-
-        // B. RESET DES EFFETS
-        player.clearStatusEffects();   // Enlever buffs/debuffs du donjon
-        player.setFireTicks(0);        // Éteindre le feu
-        player.setHealth(player.getMaxHealth()); // Soin final pour la sortie
-
-        // C. RESTAURATION DATA
-        restoreInventory(player);
-        restorePokemonLevels(player);
-
-        // D. NETTOYAGE SESSION
-        UUID uuid = player.getUuid();
-        var session = DungeonSessionManager.getPlayerSession(uuid);
-        if (session != null) {
-            session.getPlayers().remove(uuid);
-            if (session.getPlayers().isEmpty()) {
-                // Nettoyage du bloc portail et de la session
-                var server = player.getServer();
-                if (server != null) {
-                    server.getOverworld().setBlockState(session.getPortalPos(), net.minecraft.block.Blocks.AIR.getDefaultState());
-                    DungeonSessionManager.removeSession(session.getPortalPos());
-                }
-            }
-        }
-    }
-
     private void restorePokemonLevels(ServerPlayerEntity player) {
-        var party = com.cobblemon.mod.common.Cobblemon.INSTANCE.getStorage().getParty(player);
+        var party = Cobblemon.INSTANCE.getStorage().getParty(player);
         for (var pokemon : party) {
             if (pokemon.getPersistentData().contains("CDP_OriginalLevel")) {
                 int originalLevel = pokemon.getPersistentData().getInt("CDP_OriginalLevel");

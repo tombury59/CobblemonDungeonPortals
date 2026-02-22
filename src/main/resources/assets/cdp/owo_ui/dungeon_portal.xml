@@ -100,6 +100,27 @@
                                             </children>
                                         </flow-layout>
 
+                                        <flow-layout direction="horizontal">
+                                            <sizing>
+                                                <horizontal method="fill">100</horizontal>
+                                                <vertical method="content"/>
+                                            </sizing>
+                                            <children>
+                                                <label id="title">
+                                                    <text>§l§bPORTAL TERMINAL</text>
+                                                </label>
+                                                <flow-layout direction="horizontal" id="stars-container">
+                                                    <sizing>
+                                                        <horizontal method="content"/>
+                                                        <vertical method="content"/>
+                                                    </sizing>
+                                                    <margins><left>10</left></margins>
+                                                    <vertical-alignment>center</vertical-alignment>
+                                                </flow-layout>
+                                            </children>
+                                            <margins><bottom>8</bottom></margins>
+                                        </flow-layout>
+
                                         <!-- TYPE TAGS -->
                                         <flow-layout direction="horizontal" id="type-container">
                                             <sizing>
