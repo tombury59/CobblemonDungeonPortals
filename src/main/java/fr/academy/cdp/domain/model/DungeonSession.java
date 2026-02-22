@@ -32,7 +32,7 @@ public class DungeonSession {
         return players.isEmpty() ? null : players.get(0);
     }
 
-    private int gridX;
+    private int gridX = -1;
 
     public void setGridX(int x) { this.gridX = x; }
     public int getGridX() { return gridX; }

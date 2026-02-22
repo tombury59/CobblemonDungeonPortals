@@ -8,6 +8,7 @@ import fr.academy.cdp.infrastructure.entity.PortalBlockEntity;
 import fr.academy.cdp.infrastructure.command.CDPCommand;
 import fr.academy.cdp.infrastructure.service.BattleScalingService;
 import fr.academy.cdp.infrastructure.service.DungeonSurvivalService;
+import fr.academy.cdp.infrastructure.service.DungeonSpawnBlocker;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -51,6 +52,7 @@ public class CDPMod implements ModInitializer {
         CDPNetworking.registerPackets();
         BattleScalingService.register();
         DungeonSurvivalService.register();
+        DungeonSpawnBlocker.register();
 
         // LOGIQUE DE LOBBY
         ServerPlayNetworking.registerGlobalReceiver(CDPNetworking.ConfirmWarpPayload.ID, (payload, context) -> {

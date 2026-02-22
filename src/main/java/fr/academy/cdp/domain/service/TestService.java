@@ -41,8 +41,10 @@ public class TestService {
 
         // --- 1. GESTION DE LA GRID & STRUCTURE ---
         // On initialise le slot seulement si la session n'en a pas encore (premier joueur)
+        player.sendMessage(Text.literal("[DEBUG] gridX actuel : " + session.getGridX()), false);
         if (session.getGridX() == -1) {
             int slotX = GridManager.findFreeSlot();
+            player.sendMessage(Text.literal("[DEBUG] Slot libre trouvé : " + slotX), false);
             session.setGridX(slotX);
 
             // Choix de la structure selon le mode
@@ -50,11 +52,12 @@ public class TestService {
                     ? "wave_arena"
                     : "clear_tours_1";
 
+            player.sendMessage(Text.literal("[DEBUG] Placement structure : " + structureName), false);
             // Placement physique de la structure NBT
             StructureService.placeDungeonStructure(destWorld, new BlockPos(slotX, 64, 0), structureName);
         }
-
         int currentSlotX = session.getGridX();
+        player.sendMessage(Text.literal("[DEBUG] Slot utilisé pour TP : " + currentSlotX), false);
 
         // --- 2. PRÉPARATION DU JOUEUR (Hardcore No-Heal Logic) ---
         saveAndClearInventory(player);
@@ -70,9 +73,19 @@ public class TestService {
             }
         }
 
+        // --- SUPPRESSION DES COBBLEMON EXISTANTS ---
+        int removed = 0;
+        for (var entity : destWorld.getEntities()) {
+            if (entity.getType().getTranslationKey().contains("pokemon")) {
+                entity.discard();
+                removed++;
+            }
+        }
+        player.sendMessage(Text.literal("[DEBUG] Cobblemon retirés : " + removed), false);
+
         // --- 3. TÉLÉPORTATION ---
         // On TP au centre du slot X (offset 0.5 pour éviter d'être dans un mur)
-        player.teleport(destWorld, currentSlotX + 8.5, 65.0, 8.5, player.getYaw(), player.getPitch());
+        player.teleport(destWorld, currentSlotX + 8.5, 68.0, 8.5, player.getYaw(), player.getPitch());
         player.changeGameMode(GameMode.ADVENTURE);
 
         // Effets de confort pour éviter la mort par faim ou chute au spawn
@@ -122,9 +135,35 @@ public class TestService {
     private void cleanupDungeon(MinecraftServer server, DungeonSession session) {
         ServerWorld dungeonWorld = server.getWorld(DUNGEON_WORLD_KEY);
         if (dungeonWorld != null) {
-            int x = session.getGridX();
-            // On libère le slot dans le manager
-            GridManager.releaseSlot(x);
+            // Suppression complète de la zone du donjon
+            int slotX = session.getGridX();
+            int yStart = 64; // Y de base de la structure
+            int yEnd = 80;   // Y max (à adapter selon la hauteur de la structure)
+            int zStart = 0;
+            int zEnd = 32;   // Z max (à adapter selon la taille de la structure)
+            int xStart = slotX;
+            int xEnd = slotX + 32; // X max (à adapter selon la taille de la structure)
+
+            // Suppression des blocs
+            for (int x = xStart; x < xEnd; x++) {
+                for (int y = yStart; y < yEnd; y++) {
+                    for (int z = zStart; z < zEnd; z++) {
+                        BlockPos pos = new BlockPos(x, y, z);
+                        dungeonWorld.setBlockState(pos, net.minecraft.block.Blocks.AIR.getDefaultState());
+                    }
+                }
+            }
+
+            // Suppression des entités dans la zone
+            int removedEntities = 0;
+            net.minecraft.util.math.Box box = new net.minecraft.util.math.Box(xStart, yStart, zStart, xEnd, yEnd, zEnd);
+            for (var entity : dungeonWorld.getEntitiesByClass(net.minecraft.entity.Entity.class, box, e -> true)) {
+                entity.remove(net.minecraft.entity.Entity.RemovalReason.DISCARDED);
+                removedEntities++;
+            }
+
+            // Libération du slot dans le manager
+            GridManager.releaseSlot(slotX);
 
             // Suppression du portail dans l'Overworld
             BlockPos portalPos = session.getPortalPos();
@@ -132,8 +171,8 @@ public class TestService {
 
             DungeonSessionManager.removeSession(portalPos);
 
-            // Note: Une suppression réelle des blocs via itérateur peut être ajoutée ici
-            // pour optimiser les performances si nécessaire.
+            // Message debug
+            server.sendMessage(Text.literal("[CDP] Donjon supprimé : " + removedEntities + " entités retirées."));
         }
     }
 
